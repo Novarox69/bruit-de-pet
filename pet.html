@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Télécommande à pets</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f1ece4;--accent:#c4731f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17150f;--fg:#f2efe8;--card:#2a261c;--accent:#e39a4a}}
+:root[data-theme="dark"]{--bg:#17150f;--fg:#f2efe8;--card:#2a261c;--accent:#e39a4a}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px;text-align:center}
+button{font:inherit;color:var(--fg);background:var(--card);border:2px solid var(--accent);border-radius:20px;padding:22px 28px;font-size:20px;cursor:pointer;max-width:100%}
+button:active{transform:scale(.96)}
+.big{font-size:34px;padding:50px 40px;background:var(--accent);color:#fff;border:none;border-radius:50%;width:240px;height:240px}
+#status{opacity:.7;font-size:15px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="choose">
+  <h1>💨 Télécommande</h1>
+  <p>Ouvre cette même page sur les deux appareils.</p>
+  <p><button id="bPhone">📱 Je suis le téléphone</button></p>
+  <p><button id="bPc">💻 Je suis le PC</button></p>
+</div>
+
+<div id="phone" class="hidden">
+  <button class="big" id="go">💨<br>Pet !</button>
+  <div id="pStatus" class="status"></div>
+</div>
+
+<div id="pc" class="hidden">
+  <h2>💻 Mode PC</h2>
+  <button id="enable">🔊 Activer le son</button>
+  <div id="cStatus"></div>
+</div>
+
+<script>
+let room = null, ctx = null;
+const $ = id => document.getElementById(id);
+
+function show(id){ ["choose","phone","pc"].forEach(x => $(x).classList.toggle("hidden", x !== id)); }
+
+function fart(){
+  if(!ctx) return;
+  const t = ctx.currentTime, dur = 0.5 + Math.random()*0.7;
+  const o = ctx.createOscillator(); o.type = "sawtooth";
+  o.frequency.setValueAtTime(90 + Math.random()*40, t);
+  o.frequency.exponentialRampToValueAtTime(40, t + dur);
+  const lfo = ctx.createOscillator(); lfo.type = "square";
+  lfo.frequency.value = 25 + Math.random()*20;
+  const lg = ctx.createGain(); lg.gain.value = 30;
+  lfo.connect(lg); lg.connect(o.frequency);
+  const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 400;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.9, t + 0.03);
+  g.gain.setValueAtTime(0.9, t + dur - 0.1);
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  o.connect(f); f.connect(g); g.connect(ctx.destination);
+  o.start(t); lfo.start(t); o.stop(t + dur); lfo.stop(t + dur);
+}
+
+async function connect(){
+  try{ room = await claude.use("room"); }catch(e){ room = null; }
+  return room;
+}
+
+$("bPhone").onclick = async () => {
+  show("phone");
+  $("pStatus").textContent = "Connexion…";
+  await connect();
+  $("pStatus").textContent = room ? "Connecté ✅" : "Connexion impossible ❌ (ouvre la page depuis claude.ai)";
+};
+
+$("go").onclick = () => {
+  if(room){ try{ room.emit("pet", {t: Date.now()}); }catch(e){} }
+  if(navigator.vibrate) navigator.vibrate(30);
+};
+
+$("bPc").onclick = async () => {
+  show("pc");
+  await connect();
+  $("cStatus").textContent = room ? "Connecté. Clique sur « Activer le son »." : "Connexion impossible ❌";
+  if(room){ room.on("pet", () => { fart(); $("cStatus").textContent = "💨 Pet reçu à " + new Date().toLocaleTimeString(); }); }
+};
+
+$("enable").onclick = () => {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume();
+  fart();
+  $("cStatus").textContent = "Son activé ✅ Laisse cet onglet ouvert.";
+};
+</script>
+</body>
+</html>
